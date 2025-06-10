@@ -1,0 +1,42 @@
+@startuml
+' =======  DIAGRAM KLAS  =======
+skinparam linetype ortho
+
+interface "NextStepStrategyInterface" as Strategy
+
+class Step {
+  - id : string
+  - commandFqcn : string
+  - expectedEventFqcn : string
+  - nextStrategy : Strategy
+  + next(finished : DomainEvent, state : OnboardingState) : string?
+}
+
+class StepRegistry {
+  + add(step : Step)
+  + get(id : string) : Step
+}
+
+class ProcessManager {
+  - steps : StepRegistry
+  - stateRepo : OnboardingStateRepo
+  - bus : CommandBusInterface
+  + handle(cmd : StartOnboarding)
+  + onAny(e : DomainEvent)
+}
+
+interface CommandBusInterface
+class OnboardingState
+class AlwaysDocumentsStrategy
+class RiskBasedStrategy
+
+Strategy <|.. AlwaysDocumentsStrategy
+Strategy <|.. RiskBasedStrategy
+
+Step --> Strategy
+StepRegistry "1" o-- "*" Step
+ProcessManager --> StepRegistry
+ProcessManager --> CommandBusInterface
+ProcessManager ..> Step
+ProcessManager ..> OnboardingState
+@enduml
