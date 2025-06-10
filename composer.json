@@ -1,0 +1,41 @@
+{
+    "name": "jakubciszak/orchestrator",
+    "description": "Generic PHP workflow orchestrator engine (domain-agnostic, DDD-oriented)",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Ciszak",
+            "email": "jakub@example.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "phpstan/phpstan": "^1.11"
+    },
+    "autoload": {
+        "psr-4": {
+            "JakubCiszak\\Orchestrator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JakubCiszak\\Orchestrator\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse src --level max"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.0"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
