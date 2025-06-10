@@ -1,79 +1,79 @@
 # AGENTS.md
 
-> **Projekt • Onboarding Orchestrator – wytyczne dla wszystkich agentów Codex**
+> **Project • PHP Generic Orchestrator – guidelines for all Codex agents**
+
+This library must be **100 % domain‑agnostic** (no onboarding/KYC specifics).
+It will be published on Packagist; users install it via Composer and wire their own steps and strategies.
 
 ---
 
-## 0. Ogólny opis projektu
+## 0. Project overview
 
-Budujemy moduł **Orchestrator** odpowiadający za sterowanie całym procesem onboardingu klienta w fintechu.
-*Sterowanie* = ustalanie kolejnych kroków (**Step**) i emitowanie komend do wyspecjalizowanych modułów (Questions, Documents, Risk …).
-Orchestrator **nie wykonuje** logiki biznesowej kroków – jedynie nimi zarządza.
+The library provides a **workflow orchestration engine** based on DDD principles. It:
 
----
+* publishes and consumes **domain events**
+* dispatches **commands** to external bounded contexts
+* drives the flow via configurable **Steps** and **Strategies**.
 
-## 1. Zawsze myśl w DDD i rozdzielaj konteksty
-
-| Zasada                  | Co to znaczy w repo?                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bounded Context**     | • Orchestrator trzyma własny kod, własne eventy i własną bazę (snapshot procesu).<br>• Każdy krok (Questions, Risk, …) to odrębny pakiet / kontener, kontakt tylko przez *komendy* i *zdarzenia*. |
-| **Ubiquitous Language** | Nazwy klas/plików/opisów w README muszą odpowiadać słownikowi biznesu (Step, RiskCalculated, Strategy …)                                                                                          |
-| **Aggregates**          | Jedyny agregat w Orchestratorze to `OnboardingState`. Trzymaj go małym: `stage`, `risk`, `attempts`, itp.                                                                                         |
+The engine **never contains business rules** – only the mechanics of process control.
 
 ---
 
-## 2. Deklaracja > implementacja
+## 1. DDD architecture (the domain is “workflow” itself)
 
-* **Konfiguracja kieruje ruchem** – flow kroków opisujemy w DI (`services.yaml`) przez instancje `Step`.
-* **Strategie decyzyjne** (co dalej?) są wstrzykiwanymi serwisami implementującymi `NextStepStrategyInterface`.
-
-  * Dodajesz nowy krok? ➜ dopisujesz definicję w YAML, nie zmieniasz ProcessManagera.
-* **Kod silnika** (`ProcessManager`, `Step`, `StepRegistry`) jest *stabilny* – nie dopuszczamy reguł biznesowych wewnątrz.
-
----
-
-## 3. “Zawsze stosuj DDD” — konkretne check‑listy
-
-1. **Nazewnictwo**
-
-   * Event = „co SIĘ stało” → `DocsCollected`, `RiskCalculated`.
-   * Command = „zrób” → `CollectDocs`, `CalculateRisk`.
-2. **Granice (moduły)**
-
-   * Orchestrator publikuje *tylko* komendy/eventy; nie ładuje repozytoriów innych kontekstów.
-3. **Brak lepkiego stanu**
-
-   * `ProcessManager` wczytuje `OnboardingState`, podejmuje decyzję, zapisuje, wysyła komendę – koniec transakcji.
-4. **Idempotencja**
-
-   * Listener zdarzenia *musi* sprawdzić, czy event już obsłużono (kolumna `last_event_id`).
-5. **Testy**
-
-   * Jednostkowe: strategia + step registry.
-   * Integracyjne: scenariusz “happy path” symulowany zdarzeniami (patrz `/tests/Scenario/`).
+| Layer              | What it holds                                                                   | Purity rules                                                                    |
+| ------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Domain**         | `Step`, `NextStepStrategyInterface`, aggregate `ProcessState`, `ProcessManager` | • Zero framework deps.<br>• Neutral naming (“Process”, “Step”).                 |
+| **Application**    | Ports/adapters to buses, glue to frameworks                                     | • Implement interfaces, keep them DI‑friendly.<br>• No business branching here. |
+| **Infrastructure** | Symfony CompilerPass, DI tags, adapters for PSR buses                           | • Anything framework‑specific lives here so Domain stays portable.              |
 
 ---
 
-## 4. Test Driven Development
+## 2. Declaration beats implementation
 
-* **Nowa funkcjonalność zaczyna się od testu** – pisz failing test, dopiero potem implementację.
-* Pokrycie testami (unit + integration) min. **80 %**; w CI build zostanie zablokowany, jeśli spadnie niżej.
-* Mocki *tylko* na granicach kontekstów; wewnętrzne klasy testujemy realnie.
-* Scenariusze end‑to‑end (Behat/Cypress) dla krytycznych ścieżek biznesowych: start → finish oraz happy‑path z manual‑check.
-
-> **Pamiętaj** – jeśli coś zaczyna pachnieć „if‑else spaghetti” w ProcessManagerze, wróć do punktu 2: przenieś regułę do **Strategii** lub konfiguracji DI.
+* Workflow steps are **instances** of the `Step` class registered via `orchestrator.step` tag.
+* "What’s next?" logic is encapsulated in classes implementing `NextStepStrategyInterface`.
+* Users describe their flow in `services.yaml`; **core code never changes**.
 
 ---
 
-## Słowniczek skrótów
+## 3. DDD & quality checklist
 
-| Termin              | Znaczenie w projekcie                                                          |
-| ------------------- | ------------------------------------------------------------------------------ |
-| **Step**            | Konfigurowalny etap procesu, opisany serwisem Symfony (klasa `Step`).          |
-| **Strategy**        | Serwis decydujący o następnym kroku, implementuje `NextStepStrategyInterface`. |
-| **ProcessManager**  | Jedyny „dyrygent” – reaguje na zdarzenia, zmienia stan, wysyła komendy.        |
-| **OnboardingState** | Agregat, snapshot gdzie klient się znajduje.                                   |
+1. **Events/Commands** – names belong to the host app; the library only routes objects.
+2. **Aggregates** – the only built‑in aggregate is `ProcessState` (id, currentStep, meta).
+3. **Idempotency** – engine exposes a hook for processed‑event registry; storage implementation is on the host side.
+4. **Extensibility** – new step = new service definition; new rule = new Strategy class. Core remains untouched.
+5. **Framework‑agnostic** – Core depends exclusively on PSR interfaces; Symfony/Laravel adapters live in separate packages.
 
 ---
 
-Happy coding! ✌️
+## 4. Test Driven Development
+
+* **Every feature starts with a failing test** – then implementation.
+* Code coverage target **≥ 90 %** for the `core/` package (unit + integration).
+* Unit tests: `ProcessManager`, `StepRegistry`, sample strategies.
+* Integration tests: full “happy path” using in‑memory buses (see `/tests/Scenario/`).
+* External adapters (Symfony/Laravel) hold their own tests and may mock framework classes.
+
+---
+
+## 5. Glossary
+
+| Term               | Meaning inside the library                                                     |
+| ------------------ | ------------------------------------------------------------------------------ |
+| **Step**           | Configurable stage of a workflow, instance of `Step`.                          |
+| **Strategy**       | Decides which step comes next, implements `NextStepStrategyInterface`.         |
+| **ProcessManager** | The conductor – reacts to events, mutates `ProcessState`, dispatches commands. |
+| **ProcessState**   | Aggregate snapshot (generic, no domain fields).                                |
+
+---
+
+## 6. Style & CI
+
+* Target PHP 8.3+, PSR‑12 code style.
+* Static analysis: Psalm level 1 & PHPStan max.
+* GitHub Actions: `composer validate`, `phpunit --coverage`, `psalm`, `php-cs-fixer`.
+
+> **Prime directive** – the engine knows nothing about your business; you feed it commands and events, it moves the process forward.
+
+Happy shipping! 🚢
