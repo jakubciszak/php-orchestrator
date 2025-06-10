@@ -50,3 +50,6 @@
 
 # Embedded web-server pid file
 /.web-server-pid
+.phpunit.result.cache
+/.phpunit.cache
+composer.lock
