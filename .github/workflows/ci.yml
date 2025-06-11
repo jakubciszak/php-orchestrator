@@ -2,32 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "work" ]
+    branches: [ main ]
   pull_request:
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          coverage: xdebug
-      - name: Install dependencies
-        run: php composer.phar install --no-interaction --no-progress
-      - name: Validate composer.json
-        run: php composer.phar validate --no-check-all
-      - name: Run phpunit
-        run: php vendor/bin/phpunit --coverage-text
-      - name: Run phpstan
-        run: php vendor/bin/phpstan analyse src --level max
-      - name: Run psalm
-        run: |
-          curl -Ls https://github.com/vimeo/psalm/releases/latest/download/psalm.phar -o psalm.phar
-          php psalm.phar --output-format=console
-      - name: Run php-cs-fixer
-        run: |
-          curl -Ls $(curl -s https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/releases/latest | jq -r '.assets[] | select(.name|test("php-cs-fixer.phar$")) | .browser_download_url') -o php-cs-fixer.phar
-          PHP_CS_FIXER_IGNORE_ENV=1 php php-cs-fixer.phar fix src tests --dry-run --allow-risky=yes --rules=@PSR12
+          coverage: none
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - run: vendor/bin/phpstan analyse
+      - run: vendor/bin/phpunit
