@@ -27,5 +27,11 @@ jobs:
 
       - run: composer install --no-interaction --prefer-dist --no-progress
 
-      - run: vendor/bin/phpstan analyse
-      - run: vendor/bin/phpunit
+      - run: composer validate --no-check-all
+      - run: vendor/bin/phpstan analyse src --level max
+      - run: vendor/bin/phpunit --coverage-text
+      - run: curl -Ls https://github.com/vimeo/psalm/releases/latest/download/psalm.phar -o psalm.phar
+      - run: php psalm.phar --output-format=console
+      - run: curl -Ls https://cs.symfony.com/download/php-cs-fixer-v3.phar -o php-cs-fixer.phar
+      - run: PHP_CS_FIXER_IGNORE_ENV=1 php php-cs-fixer.phar fix src --dry-run --allow-risky=yes --rules=@PSR12
+      - run: PHP_CS_FIXER_IGNORE_ENV=1 php php-cs-fixer.phar fix tests --dry-run --allow-risky=yes --rules=@PSR12
